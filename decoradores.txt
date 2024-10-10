@@ -1,0 +1,43 @@
+""" 
+Un decorador en Python es una función que toma otra función y extiende su comportamiento sin 
+modificar explícitamente esa función.
+
+Esta abstracción permite que la inyección de dependencias se maneje fuera de la función de la ruta 
+y se pueda reutilizar en múltiples rutas o funciones que necesiten acceder a la base de datos.
+
+El decorador se encarga de asegurar que cada vez que se llame a una función decorada, se obtenga una 
+conexión a la base de datos y se le pase como argumento a esa función. Luego, se garantiza que la 
+conexión a la base de datos se cierre adecuadamente después de que la función termine su ejecución. 
+"""
+
+# Suponiendo que tienes una función para obtener la sesión local
+def get_db():
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
+
+# Decorador personalizado para inyectar la sesión de la base de datos
+def db_session(function):
+    def wrapper(*args, **kwargs):
+        with next(get_db()) as db:
+            return function(*args, db=db, **kwargs)
+    return wrapper
+
+# Ejemplo de función que usa la sesión de la base de datos
+@db_session
+def get_user(user_id: int, db: Session):
+    query = "SELECT * FROM users WHERE id = :user_id"
+    result = db.execute(query, {"user_id": user_id})
+    user_info = result.fetchone()
+
+db_session es un decorador: Es una función que toma como argumento la función que será decorada (en este caso, function), y devuelve una función (en este caso, wrapper) que extiende el comportamiento de function.
+
+wrapper es la función que reemplazará a la función original: wrapper es la función interna que se retorna como resultado del decorador. Es la función que finalmente se llamará cuando uses @db_session antes de otra función.
+
+*args y **kwargs: *args y **kwargs son usados para aceptar un número variable de argumentos posicionales y de palabras clave, respectivamente. Esto permite que el decorador funcione con cualquier función sin importar su firma.
+
+with next(get_db()) as db: Aquí se está obteniendo la conexión a la base de datos utilizando next(get_db()). get_db() es una función que devuelve un generador, y next() se usa para obtener la siguiente iteración del generador, que en este caso es la conexión a la base de datos. Luego, with se encarga de garantizar que la conexión a la base de datos se cierre correctamente después de su uso.
+
+return function(*args, db=db, **kwargs): Llama a la función original (function) con los argumentos originales (*args y **kwargs) y agrega la conexión a la base de datos (db) como un argumento adicional. Esto asegura que la función decorada tenga acceso a la conexión a la base de datos.
